@@ -1,0 +1,41 @@
+{
+  "name": "worknest-tests",
+  "version": "1.0.0",
+  "description": "Test suite for WorkNest Employee Management System",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:frontend": "jest --testPathPattern=frontend",
+    "test:backend": "jest --testPathPattern=backend"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/user-event": "^14.0.0",
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0",
+    "supertest": "^6.3.0",
+    "bcrypt": "^5.1.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": ["<rootDir>/setupTests.js"],
+    "moduleNameMapping": {
+      "\\.(css|less|scss|sass)$": "identity-obj-proxy"
+    },
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx}",
+      "backend/**/*.js",
+      "!src/main.jsx",
+      "!src/vite-env.d.js",
+      "!backend/config/**",
+      "!backend/setup/**"
+    ],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
+  }
+}
