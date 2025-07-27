@@ -1,10 +1,12 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/sidebar.css';
 
 const Sidebar = ({ userRole = 'admin' }) => {
   const location = useLocation();
+  const { logout } = useAuth();
   
   const adminMenuItems = [
     { path: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
@@ -28,7 +30,7 @@ const Sidebar = ({ userRole = 'admin' }) => {
   const menuItems = userRole === 'admin' ? adminMenuItems : staffMenuItems;
   
   const handleLogout = () => {
-    window.location.href = '/';
+    logout();
   };
   
   return (

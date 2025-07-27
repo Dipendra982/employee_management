@@ -2,7 +2,13 @@ const API_BASE_URL = 'http://localhost:5001/api';
 
 class ApiClient {
   constructor() {
-    this.token = localStorage.getItem('authToken');
+    // Check for token in both possible keys for backward compatibility
+    this.token = localStorage.getItem('authToken') || localStorage.getItem('token');
+    // Ensure we use the consistent key
+    if (this.token && !localStorage.getItem('authToken')) {
+      localStorage.setItem('authToken', this.token);
+      localStorage.removeItem('token');
+    }
   }
 
   setToken(token) {
@@ -50,10 +56,10 @@ class ApiClient {
     }
   }
 
-  async register(email, password) {
+  async register(username, email, password, role = 'staff') {
     const data = await this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, email, password, role }),
     });
     
     if (data.token) {

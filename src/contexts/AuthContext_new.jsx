@@ -16,27 +16,12 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       if (token) {
         apiClient.setToken(token);
-        try {
-          const userData = await apiClient.get('/auth/profile');
-          setUser(userData);
-          setIsAuthenticated(true);
-          // Ensure we're using the consistent token key
-          if (!localStorage.getItem('authToken')) {
-            localStorage.setItem('authToken', token);
-            localStorage.removeItem('token'); // Remove old key if exists
-          }
-        } catch (error) {
-          // If token is invalid, clear it and redirect to login
-          console.error('Token validation failed:', error);
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('token');
-          apiClient.setToken(null);
-          setUser(null);
-          setIsAuthenticated(false);
-        }
+        const userData = await apiClient.get('/auth/profile');
+        setUser(userData);
+        setIsAuthenticated(true);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -46,9 +31,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signup = async (username, email, password, role = 'staff') => {
+  const signup = async (email, password, role) => {
     try {
-      const response = await apiClient.register(username, email, password, role);
+      const response = await apiClient.register(email, password);
       setUser(response.user);
       setIsAuthenticated(true);
       return response;
@@ -71,8 +56,6 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token'); // Remove any old token keys
     apiClient.logout();
     navigate('/'); 
   };
@@ -92,7 +75,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, isAuthenticated, signup, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, signup, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

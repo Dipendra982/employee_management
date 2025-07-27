@@ -252,7 +252,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
         COUNT(CASE WHEN status = 'present' THEN 1 END) as present_days
       FROM attendance 
       WHERE user_id = :userId 
-      AND DATE_PART('year', check_in_time) = DATE_PART('year', CURRENT_DATE)
+      AND DATE_PART('year', date) = DATE_PART('year', CURRENT_DATE)
     `, {
       replacements: { userId },
       type: sequelize.QueryTypes.SELECT

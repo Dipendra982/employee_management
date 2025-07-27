@@ -15,6 +15,7 @@ const AdminDashboard = () => {
   const [recentAttendance, setRecentAttendance] = useState([]);
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -24,47 +25,55 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
+      
+      // Initialize data arrays to prevent undefined errors
+      let usersData = [];
+      let attendanceData = [];
+      let leavesData = [];
       
       // Fetch leave requests first (this should work)
-      const leavesResponse = await apiClient.get('/leaves');
-      const leavesData = leavesResponse.leaves || [];
+      try {
+        const leavesResponse = await apiClient.get('/leaves');
+        leavesData = leavesResponse.leaves || leavesResponse.data || leavesResponse || [];
+      } catch (leaveError) {
+        console.warn('Failed to fetch leaves:', leaveError.message);
+      }
       
       // Try to fetch users, but handle errors gracefully
-      let usersData = [];
       try {
         const usersResponse = await apiClient.get('/users');
-        usersData = usersResponse.users || usersResponse || [];
+        usersData = usersResponse.data || usersResponse.users || usersResponse || [];
       } catch (userError) {
-        console.warn('Failed to fetch users:', userError);
+        console.warn('Failed to fetch users:', userError.message);
         // Continue without user data
       }
       
       // Try to fetch attendance data
-      let attendanceData = [];
       try {
         const attendanceResponse = await apiClient.get('/attendance');
-        attendanceData = attendanceResponse || [];
+        attendanceData = attendanceResponse.data || attendanceResponse || [];
       } catch (attendanceError) {
-        console.warn('Failed to fetch attendance:', attendanceError);
+        console.warn('Failed to fetch attendance:', attendanceError.message);
         // Continue without attendance data
       }
       
-      // Calculate stats
+      // Calculate stats with null checks
       const today = new Date().toISOString().split('T')[0];
-      const todayAttendance = attendanceData.filter(record => record.date === today);
+      const todayAttendance = (attendanceData || []).filter(record => record.date === today);
       const presentToday = todayAttendance.filter(record => record.status === 'present' || record.status === 'late').length;
-      const pendingLeaveRequests = leavesData.filter(leave => leave.status === 'pending');
+      const pendingLeaveRequests = (leavesData || []).filter(leave => leave.status === 'pending');
       
       setStats([
-        { icon: '👥', number: usersData.length.toString(), label: 'Total Staff' },
+        { icon: '👥', number: (usersData || []).length.toString(), label: 'Total Staff' },
         { icon: '✅', number: presentToday.toString(), label: 'Present Today' },
         { icon: '📋', number: '0', label: 'Pending Tasks' }, // TODO: Add tasks API
-        { icon: '📄', number: pendingLeaveRequests.length.toString(), label: 'Leave Requests' }
+        { icon: '📄', number: (pendingLeaveRequests || []).length.toString(), label: 'Leave Requests' }
       ]);
       
-      // Set recent attendance (today's records)
-      setRecentAttendance(todayAttendance.slice(0, 5).map(record => ({
-        name: record.user?.username || 'Unknown',
+      // Set recent attendance (today's records) with null checks
+      setRecentAttendance((todayAttendance || []).slice(0, 5).map(record => ({
+        name: record.user?.username || record.username || 'Unknown',
         status: record.status === 'present' ? 'Present' : record.status === 'late' ? 'Late' : 'Absent',
         time: record.check_in ? new Date(`2000-01-01T${record.check_in}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'
       })));
