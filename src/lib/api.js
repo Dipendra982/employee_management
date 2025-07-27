@@ -95,6 +95,10 @@ class ApiClient {
     });
   }
 
+  async getUserStats() {
+    return await this.request('/auth/stats');
+  }
+
   // HTTP method helpers
   async get(endpoint, options = {}) {
     return await this.request(endpoint, {

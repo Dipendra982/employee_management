@@ -12,7 +12,7 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState({
-    name: '',
+    username: '',
     email: '',
     phone: '',
     department: '',
@@ -25,11 +25,17 @@ const Profile = () => {
   });
   
   const [editData, setEditData] = useState({ ...profileData });
+  const [stats, setStats] = useState({
+    attendanceRate: '0%',
+    tasksCompleted: 0,
+    leaveDaysUsed: 0,
+    performanceRating: 0.0
+  });
 
   useEffect(() => {
     if (user) {
       const userData = {
-        name: user.name || user.username || '',
+        username: user.username || '',
         email: user.email || '',
         phone: user.phone || '',
         department: user.department || '',
@@ -42,8 +48,21 @@ const Profile = () => {
       };
       setProfileData(userData);
       setEditData(userData);
+      
+      // Fetch user statistics
+      fetchUserStats();
     }
   }, [user]);
+
+  const fetchUserStats = async () => {
+    try {
+      const userStats = await apiClient.getUserStats();
+      setStats(userStats);
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+      toast.error('Failed to load user statistics');
+    }
+  };
   
   const handleEdit = () => {
     setIsEditing(true);
@@ -55,9 +74,8 @@ const Profile = () => {
     setLoading(true);
     
     try {
-      // Only send fields that users can edit
+      // Only send fields that users can edit (username is read-only)
       const updateData = {
-        name: editData.name,
         phone: editData.phone,
         address: editData.address,
         emergencyContact: editData.emergencyContact
@@ -160,20 +178,10 @@ const Profile = () => {
             <form onSubmit={handleSave}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
                 <div className="form-group">
-                  <label className="form-label">Full Name</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={editData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      required
-                    />
-                  ) : (
-                    <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                      {profileData.name || 'Not set'}
-                    </div>
-                  )}
+                  <label className="form-label">Username</label>
+                  <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px', color: '#666' }}>
+                    {profileData.username} (Read-only)
+                  </div>
                 </div>
                 
                 <div className="form-group">
@@ -297,19 +305,19 @@ const Profile = () => {
           <h3 style={{ marginBottom: '16px' }}>Account Statistics</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>92%</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>{stats.attendanceRate}</div>
               <div style={{ fontSize: '14px', color: '#666' }}>Attendance Rate</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>15</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>{stats.tasksCompleted}</div>
               <div style={{ fontSize: '14px', color: '#666' }}>Tasks Completed</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>8</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>{stats.leaveDaysUsed}</div>
               <div style={{ fontSize: '14px', color: '#666' }}>Leave Days Used</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffc107' }}>4.8</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffc107' }}>{stats.performanceRating}</div>
               <div style={{ fontSize: '14px', color: '#666' }}>Performance Rating</div>
             </div>
           </div>

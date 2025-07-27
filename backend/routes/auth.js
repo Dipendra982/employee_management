@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
+import { sequelize } from '../config/database.js';
 import User from '../models/User.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -175,7 +176,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      name: user.name || user.username,
       phone: user.phone,
       department: user.department,
       position: user.position,
@@ -198,16 +198,15 @@ router.get('/profile', authenticateToken, async (req, res) => {
 // Update profile endpoint
 router.put('/profile', authenticateToken, async (req, res) => {
   try {
-    const { name, phone, address, emergencyContact } = req.body;
+    const { phone, address, emergencyContact } = req.body;
     
     const user = await User.findByPk(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update only the fields that users can modify
+    // Update only the fields that users can modify (username is read-only)
     const updates = {};
-    if (name !== undefined) updates.name = name;
     if (phone !== undefined) updates.phone = phone;
     if (address !== undefined) updates.address = address;
     if (emergencyContact !== undefined) updates.emergencyContact = emergencyContact;
@@ -221,7 +220,6 @@ router.put('/profile', authenticateToken, async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        name: user.name,
         phone: user.phone,
         department: user.department,
         position: user.position,
@@ -237,6 +235,84 @@ router.put('/profile', authenticateToken, async (req, res) => {
     console.error('Profile update error:', error);
     res.status(500).json({ 
       message: 'Error updating profile',
+      error: error.message 
+    });
+  }
+});
+
+// Get user statistics endpoint
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Get attendance statistics
+    const attendanceStats = await sequelize.query(`
+      SELECT 
+        COUNT(*) as total_days,
+        COUNT(CASE WHEN status = 'present' THEN 1 END) as present_days
+      FROM attendance 
+      WHERE user_id = :userId 
+      AND DATE_PART('year', check_in_time) = DATE_PART('year', CURRENT_DATE)
+    `, {
+      replacements: { userId },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Get tasks statistics
+    const taskStats = await sequelize.query(`
+      SELECT 
+        COUNT(*) as total_tasks,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_tasks
+      FROM tasks 
+      WHERE assigned_to = :userId
+    `, {
+      replacements: { userId },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Get leave statistics
+    const leaveStats = await sequelize.query(`
+      SELECT 
+        COALESCE(SUM(CASE 
+          WHEN status = 'approved' 
+          THEN DATE_PART('day', end_date - start_date) + 1 
+          ELSE 0 
+        END), 0) as leave_days_used
+      FROM leaves 
+      WHERE user_id = :userId 
+      AND DATE_PART('year', start_date) = DATE_PART('year', CURRENT_DATE)
+    `, {
+      replacements: { userId },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    // Calculate attendance rate
+    const totalDays = attendanceStats[0]?.total_days || 0;
+    const presentDays = attendanceStats[0]?.present_days || 0;
+    const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+
+    // Get completed tasks count
+    const completedTasks = taskStats[0]?.completed_tasks || 0;
+
+    // Get leave days used
+    const leaveDaysUsed = parseInt(leaveStats[0]?.leave_days_used) || 0;
+
+    // Calculate performance rating (simple formula based on attendance and task completion)
+    const totalTasks = taskStats[0]?.total_tasks || 1;
+    const taskCompletionRate = (completedTasks / totalTasks) * 100;
+    const performanceRating = ((attendanceRate * 0.6) + (taskCompletionRate * 0.4)) / 20; // Scale to 5.0
+    const roundedRating = Math.min(5.0, Math.max(1.0, Number(performanceRating.toFixed(1))));
+
+    res.json({
+      attendanceRate: `${attendanceRate}%`,
+      tasksCompleted: completedTasks,
+      leaveDaysUsed: leaveDaysUsed,
+      performanceRating: roundedRating
+    });
+  } catch (error) {
+    console.error('Stats fetch error:', error);
+    res.status(500).json({ 
+      message: 'Error fetching user statistics',
       error: error.message 
     });
   }
