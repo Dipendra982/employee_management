@@ -218,11 +218,11 @@ const Landing = () => {
               <div 
                 key={index}
                 style={{
-                  padding: '2rem',
+                  padding: '3rem',
                   borderRadius: '16px',
                   background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  transition: 'all 0.3s ease',
+                  border: '1px solid #0f5fc7ff',
+                  transition: 'all 0.6s ease',
                   cursor: 'pointer'
                 }}
                 onMouseOver={(e) => {
