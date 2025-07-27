@@ -227,19 +227,19 @@ const MyTasks = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
-                {Math.round((tasks.filter(t => t.status === 'Completed').length / tasks.length) * 100)}%
+                {tasks.length > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
               </div>
               <div style={{ fontSize: '14px', color: '#666' }}>Completion Rate</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc3545' }}>
-                {tasks.filter(t => new Date(t.dueDate) < new Date() && t.status !== 'Completed').length}
+                {tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'completed').length}
               </div>
               <div style={{ fontSize: '14px', color: '#666' }}>Overdue Tasks</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>
-                {tasks.filter(t => t.priority === 'High' && t.status !== 'Completed').length}
+                {tasks.filter(t => (t.priority === 'high' || t.priority === 'urgent') && t.status !== 'completed').length}
               </div>
               <div style={{ fontSize: '14px', color: '#666' }}>High Priority</div>
             </div>
