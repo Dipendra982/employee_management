@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
 import { apiClient } from '../../lib/api';
-import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const ApplyLeave = () => {
@@ -14,7 +13,6 @@ const ApplyLeave = () => {
   const [loading, setLoading] = useState(true);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
   const [newApplication, setNewApplication] = useState({
     leave_type: 'sick',
     start_date: '',
@@ -41,7 +39,7 @@ const ApplyLeave = () => {
       }
     } catch (error) {
       console.error('Error fetching leave data:', error);
-      toast.error('Failed to load leave data');
+      alert('Failed to load leave data');
     } finally {
       setLoading(false);
     }
@@ -78,13 +76,13 @@ const ApplyLeave = () => {
         reason: '' 
       });
       setShowApplicationForm(false);
-      toast.success('Leave application submitted successfully!');
+      alert('Leave application submitted successfully!');
       
       // Refresh leave data
       await fetchLeaveData();
     } catch (error) {
       console.error('Error submitting leave application:', error);
-      toast.error(error.response?.data?.error || 'Failed to submit leave application,Start date must be in the future');
+      alert(error.response?.data?.error || 'Failed to submit leave application');
     } finally {
       setIsSubmitting(false);
     }

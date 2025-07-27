@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import User from '../models/User.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -153,6 +154,65 @@ router.post('/login', async (req, res) => {
     
     res.status(500).json({ 
       message: 'Server error during login',
+      error: error.message 
+    });
+  }
+});
+
+// Profile endpoint - get current user profile
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.userId, {
+      attributes: { exclude: ['password'] }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      name: user.name || user.username,
+      department: user.department,
+      position: user.position,
+      is_active: user.is_active
+    });
+  } catch (error) {
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ 
+      message: 'Error fetching profile',
+      error: error.message 
+    });
+  }
+});
+
+// Verify token endpoint
+router.get('/verify', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.userId, {
+      attributes: { exclude: ['password'] }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      valid: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(500).json({ 
+      message: 'Error verifying token',
       error: error.message 
     });
   }

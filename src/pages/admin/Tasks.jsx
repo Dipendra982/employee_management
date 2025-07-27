@@ -1,50 +1,111 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const AdminTasks = () => {
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'Update website content', assignedTo: 'John Doe', priority: 'High', dueDate: '2023-12-20', status: 'In Progress' },
-    { id: 2, title: 'Prepare monthly report', assignedTo: 'Jane Smith', priority: 'Medium', dueDate: '2023-12-18', status: 'Completed' },
-    { id: 3, title: 'Client meeting preparation', assignedTo: 'Mike Johnson', priority: 'High', dueDate: '2023-12-16', status: 'Pending' },
-    { id: 4, title: 'Database backup', assignedTo: 'Sarah Williams', priority: 'Low', dueDate: '2023-12-22', status: 'Pending' }
-  ]);
-  
+  const [tasks, setTasks] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, inProgress: 0, completed: 0 });
+  const { toast } = useToast();
+  
   const [newTask, setNewTask] = useState({
     title: '',
-    assignedTo: '',
-    priority: 'Medium',
-    dueDate: '',
+    assigned_to: '',
+    priority: 'medium',
+    due_date: '',
     description: ''
   });
-  
-  const staffMembers = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'Tom Wilson'];
-  
-  const handleAddTask = (e) => {
-    e.preventDefault();
-    const task = {
-      id: Date.now(),
-      ...newTask,
-      status: 'Pending'
-    };
-    setTasks([...tasks, task]);
-    setNewTask({ title: '', assignedTo: '', priority: 'Medium', dueDate: '', description: '' });
-    setShowAddForm(false);
+
+  useEffect(() => {
+    fetchTasks();
+    fetchUsers();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/tasks');
+      setTasks(response.tasks || []);
+      setStats(response.stats || { total: 0, pending: 0, inProgress: 0, completed: 0 });
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      toast.error('Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  const handleDeleteTask = (id) => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      setTasks(tasks.filter(task => task.id !== id));
+
+  const fetchUsers = async () => {
+    try {
+      const response = await apiClient.get('/users');
+      setUsers(response.data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
     }
   };
   
-  const stats = [
-    { label: 'Total Tasks', value: tasks.length.toString() },
-    { label: 'Pending', value: tasks.filter(t => t.status === 'Pending').length.toString() },
-    { label: 'In Progress', value: tasks.filter(t => t.status === 'In Progress').length.toString() },
-    { label: 'Completed', value: tasks.filter(t => t.status === 'Completed').length.toString() }
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    
+    if (isSubmitting) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      await apiClient.post('/tasks', newTask);
+      
+      toast.success('Task assigned successfully!');
+      setNewTask({ title: '', assigned_to: '', priority: 'medium', due_date: '', description: '' });
+      setShowAddForm(false);
+      
+      // Refresh tasks
+      await fetchTasks();
+      
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast.error(error.response?.data?.error || 'Failed to assign task');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleDeleteTask = async (id, title) => {
+    if (window.confirm(`Are you sure you want to delete "${title}"?`)) {
+      try {
+        await apiClient.delete(`/tasks/${id}`);
+        toast.success('Task deleted successfully!');
+        
+        // Refresh tasks
+        await fetchTasks();
+        
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        toast.error('Failed to delete task');
+      }
+    }
+  };
+
+  const formatPriority = (priority) => {
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
+  };
+
+  const formatStatus = (status) => {
+    if (status === 'in-progress') return 'In Progress';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const statsCards = [
+    { label: 'Total Tasks', value: stats.total.toString() },
+    { label: 'Pending', value: stats.pending.toString() },
+    { label: 'In Progress', value: stats.inProgress.toString() },
+    { label: 'Completed', value: stats.completed.toString() }
   ];
   
   return (
@@ -58,7 +119,7 @@ const AdminTasks = () => {
         </div>
         
         <div className="stats-grid">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <div key={index} className="stat-card">
               <div className="stat-number">{stat.value}</div>
               <div className="stat-label">{stat.label}</div>
@@ -94,13 +155,13 @@ const AdminTasks = () => {
                   <label className="form-label">Assign To</label>
                   <select
                     className="form-control"
-                    value={newTask.assignedTo}
-                    onChange={(e) => setNewTask({...newTask, assignedTo: e.target.value})}
+                    value={newTask.assigned_to}
+                    onChange={(e) => setNewTask({...newTask, assigned_to: e.target.value})}
                     required
                   >
                     <option value="">Select Staff Member</option>
-                    {staffMembers.map(member => (
-                      <option key={member} value={member}>{member}</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>{user.username} ({user.email})</option>
                     ))}
                   </select>
                 </div>
@@ -111,9 +172,10 @@ const AdminTasks = () => {
                     value={newTask.priority}
                     onChange={(e) => setNewTask({...newTask, priority: e.target.value})}
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
                   </select>
                 </div>
                 <div className="form-group">
@@ -121,9 +183,9 @@ const AdminTasks = () => {
                   <input
                     type="date"
                     className="form-control"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
-                    required
+                    value={newTask.due_date}
+                    onChange={(e) => setNewTask({...newTask, due_date: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
               </div>
@@ -137,7 +199,13 @@ const AdminTasks = () => {
                   placeholder="Task description and requirements..."
                 />
               </div>
-              <button type="submit" className="btn btn-success">Assign Task</button>
+              <button 
+                type="submit" 
+                className="btn btn-success"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Assigning...' : 'Assign Task'}
+              </button>
             </form>
           </div>
         )}
@@ -158,40 +226,55 @@ const AdminTasks = () => {
               </tr>
             </thead>
             <tbody>
-              {tasks.map((task) => (
-                <tr key={task.id}>
-                  <td>{task.title}</td>
-                  <td>{task.assignedTo}</td>
-                  <td>
-                    <span className={`status-badge ${
-                      task.priority === 'High' ? 'status-rejected' :
-                      task.priority === 'Medium' ? 'status-pending' :
-                      'status-approved'
-                    }`}>
-                      {task.priority}
-                    </span>
-                  </td>
-                  <td>{new Date(task.dueDate).toLocaleDateString()}</td>
-                  <td>
-                    <span className={`status-badge ${
-                      task.status === 'Completed' ? 'status-approved' :
-                      task.status === 'In Progress' ? 'status-pending' :
-                      'status-absent'
-                    }`}>
-                      {task.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button 
-                      className="btn btn-danger"
-                      style={{ padding: '4px 8px', fontSize: '12px' }}
-                      onClick={() => handleDeleteTask(task.id)}
-                    >
-                      Delete
-                    </button>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
+                    Loading tasks...
                   </td>
                 </tr>
-              ))}
+              ) : tasks.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                    No tasks found
+                  </td>
+                </tr>
+              ) : (
+                tasks.map((task) => (
+                  <tr key={task.id}>
+                    <td>{task.title}</td>
+                    <td>{task.assignee?.username || 'Unknown'}</td>
+                    <td>
+                      <span className={`status-badge ${
+                        task.priority === 'high' || task.priority === 'urgent' ? 'status-rejected' :
+                        task.priority === 'medium' ? 'status-pending' :
+                        'status-approved'
+                      }`}>
+                        {formatPriority(task.priority)}
+                      </span>
+                    </td>
+                    <td>{task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}</td>
+                    <td>
+                      <span className={`status-badge ${
+                        task.status === 'completed' ? 'status-approved' :
+                        task.status === 'in-progress' ? 'status-pending' :
+                        task.status === 'pending' ? 'status-absent' :
+                        'status-rejected'
+                      }`}>
+                        {formatStatus(task.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <button 
+                        className="btn btn-danger"
+                        style={{ padding: '4px 8px', fontSize: '12px' }}
+                        onClick={() => handleDeleteTask(task.id, task.title)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

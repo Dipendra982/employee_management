@@ -1,3 +1,4 @@
-import { useToast, toast } from "@/hooks/use-toast";
+// @ts-ignore
+import { useToast } from "../../contexts/ToastContext";
 
-export { useToast, toast };
+export { useToast };

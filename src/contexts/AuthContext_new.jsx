@@ -19,18 +19,9 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('authToken');
       if (token) {
         apiClient.setToken(token);
-        try {
-          const userData = await apiClient.get('/auth/profile');
-          setUser(userData);
-          setIsAuthenticated(true);
-        } catch (error) {
-          // If token is invalid, clear it and redirect to login
-          console.error('Token validation failed:', error);
-          localStorage.removeItem('authToken');
-          apiClient.setToken(null);
-          setUser(null);
-          setIsAuthenticated(false);
-        }
+        const userData = await apiClient.get('/auth/profile');
+        setUser(userData);
+        setIsAuthenticated(true);
       }
     } catch (error) {
       console.error('Auth check failed:', error);

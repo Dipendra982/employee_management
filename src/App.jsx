@@ -2,6 +2,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import Landing from './pages/landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -26,31 +28,35 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        
-        {/* Admin Routes */}
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin/staff" element={<StaffManagement />} />
-        <Route path="/admin/attendance" element={<AdminAttendance />} />
-        <Route path="/admin/leaves" element={<AdminLeaves />} />
-        <Route path="/admin/tasks" element={<AdminTasks />} />
-        <Route path="/admin/notices" element={<AdminNotices />} />
-        <Route path="/admin/reports" element={<AdminReports />} />
-        
-        {/* Staff Routes */}
-        <Route path="/staff/dashboard" element={<StaffDashboard />} />
-        <Route path="/staff/attendance" element={<MyAttendance />} />
-        <Route path="/staff/leaves" element={<ApplyLeave />} />
-        <Route path="/staff/tasks" element={<MyTasks />} />
-        <Route path="/staff/notices" element={<StaffNotices />} />
-        <Route path="/staff/profile" element={<Profile />} />
-        
-        {/* Redirect unknown routes */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <AuthProvider>
+        <ToastProvider>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/staff" element={<StaffManagement />} />
+            <Route path="/admin/attendance" element={<AdminAttendance />} />
+            <Route path="/admin/leaves" element={<AdminLeaves />} />
+            <Route path="/admin/tasks" element={<AdminTasks />} />
+            <Route path="/admin/notices" element={<AdminNotices />} />
+            <Route path="/admin/reports" element={<AdminReports />} />
+            
+            {/* Staff Routes */}
+            <Route path="/staff/dashboard" element={<StaffDashboard />} />
+            <Route path="/staff/attendance" element={<MyAttendance />} />
+            <Route path="/staff/leaves" element={<ApplyLeave />} />
+            <Route path="/staff/tasks" element={<MyTasks />} />
+            <Route path="/staff/notices" element={<StaffNotices />} />
+            <Route path="/staff/profile" element={<Profile />} />
+            
+            {/* Redirect unknown routes */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ToastProvider>
+      </AuthProvider>
     </BrowserRouter>
   </QueryClientProvider>
 );

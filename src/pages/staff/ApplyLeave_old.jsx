@@ -1,11 +1,25 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
 import { apiClient } from '../../lib/api';
-import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const ApplyLeave = () => {
-  const [leaveApplications, setLeaveApplications] = useState([]);
+  const [leaveApplications, setLeaveApplic                {leaveApplications.map((application) => (
+                  <tr key={application.id}>
+                    <td>{application.leave_type?.charAt(0).toUpperCase() + application.leave_type?.slice(1)}</td>
+                    <td>{formatDate(application.start_date)}</td>
+                    <td>{formatDate(application.end_date)}</td>
+                    <td>{application.total_days}</td>
+                    <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>{application.reason}</td>
+                    <td>
+                      <span className={`status-badge ${getStatusColor(application.status)}`}>
+                        {application.status?.charAt(0).toUpperCase() + application.status?.slice(1)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>ate([]);
   const [leaveBalance, setLeaveBalance] = useState({
     total: 20,
     used: 0,
@@ -14,14 +28,13 @@ const ApplyLeave = () => {
   const [loading, setLoading] = useState(true);
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
   const [newApplication, setNewApplication] = useState({
     leave_type: 'sick',
     start_date: '',
     end_date: '',
     reason: ''
   });
-
+  
   const leaveTypes = ['sick', 'casual', 'annual', 'maternity', 'paternity', 'other'];
   
   // Fetch leave data on component mount
@@ -41,7 +54,7 @@ const ApplyLeave = () => {
       }
     } catch (error) {
       console.error('Error fetching leave data:', error);
-      toast.error('Failed to load leave data');
+      alert('Failed to load leave data');
     } finally {
       setLoading(false);
     }
@@ -78,13 +91,13 @@ const ApplyLeave = () => {
         reason: '' 
       });
       setShowApplicationForm(false);
-      toast.success('Leave application submitted successfully!');
+      alert('Leave application submitted successfully!');
       
       // Refresh leave data
       await fetchLeaveData();
     } catch (error) {
       console.error('Error submitting leave application:', error);
-      toast.error(error.response?.data?.error || 'Failed to submit leave application,Start date must be in the future');
+      alert(error.response?.data?.error || 'Failed to submit leave application');
     } finally {
       setIsSubmitting(false);
     }
@@ -114,7 +127,7 @@ const ApplyLeave = () => {
       </div>
     );
   }
-
+  
   return (
     <div className="dashboard-layout">
       <Sidebar userRole="staff" />
@@ -139,7 +152,7 @@ const ApplyLeave = () => {
             <div className="stat-label">Remaining Days</div>
           </div>
           <div className="stat-card">
-            <div className="stat-number" style={{ color: '#ffc107' }}>{leaveApplications.filter(l => l.status === 'pending').length}</div>
+            <div className="stat-number" style={{ color: '#ffc107' }}>{leaveApplications.filter(l => l.status === 'Pending').length}</div>
             <div className="stat-label">Pending Requests</div>
           </div>
         </div>
@@ -252,14 +265,14 @@ const ApplyLeave = () => {
               <tbody>
                 {leaveApplications.map((application) => (
                   <tr key={application.id}>
-                    <td>{application.leave_type?.charAt(0).toUpperCase() + application.leave_type?.slice(1)}</td>
+                    <td>{application.leave_type}</td>
                     <td>{formatDate(application.start_date)}</td>
                     <td>{formatDate(application.end_date)}</td>
                     <td>{application.total_days}</td>
                     <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>{application.reason}</td>
                     <td>
                       <span className={`status-badge ${getStatusColor(application.status)}`}>
-                        {application.status?.charAt(0).toUpperCase() + application.status?.slice(1)}
+                        {application.status}
                       </span>
                     </td>
                   </tr>

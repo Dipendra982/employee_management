@@ -1,38 +1,124 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const MyAttendance = () => {
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const [checkInTime, setCheckInTime] = useState(null);
-  const [attendanceHistory] = useState([
-    { date: '2023-12-11', checkIn: '09:15 AM', checkOut: '06:30 PM', hours: '8.25', status: 'Present' },
-    { date: '2023-12-10', checkIn: '09:30 AM', checkOut: '06:15 PM', hours: '7.75', status: 'Present' },
-    { date: '2023-12-09', checkIn: '-', checkOut: '-', hours: '0', status: 'Absent' },
-    { date: '2023-12-08', checkIn: '08:45 AM', checkOut: '05:45 PM', hours: '9', status: 'Present' },
-    { date: '2023-12-07', checkIn: '10:00 AM', checkOut: '07:00 PM', hours: '8', status: 'Late' }
-  ]);
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
+  const [todayAttendance, setTodayAttendance] = useState(null);
+  const [stats, setStats] = useState({
+    thisMonth: 0,
+    totalPresent: 0,
+    lateArrivals: 0,
+    absentDays: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
   
-  const stats = [
-    { label: 'This Month', value: '18 days', color: '#28a745' },
-    { label: 'Total Present', value: '22 days', color: '#007bff' },
-    { label: 'Late Arrivals', value: '2 days', color: '#ffc107' },
-    { label: 'Absent Days', value: '3 days', color: '#dc3545' }
-  ];
-  
-  const handleCheckIn = () => {
-    if (!isCheckedIn) {
-      setIsCheckedIn(true);
-      setCheckInTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } else {
-      // Check out
-      setIsCheckedIn(false);
-      alert(`Checked out successfully at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+  // Fetch attendance data
+  useEffect(() => {
+    fetchAttendanceData();
+  }, []);
+
+  const fetchAttendanceData = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/attendance/user');
+      const { attendance, todayAttendance: today, stats: attendanceStats } = response;
+      
+      setAttendanceHistory(attendance || []);
+      setTodayAttendance(today);
+      setStats(attendanceStats || {
+        thisMonth: 0,
+        totalPresent: 0,
+        lateArrivals: 0,
+        absentDays: 0
+      });
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+      toast.error('Failed to load attendance data');
+    } finally {
+      setLoading(false);
     }
   };
   
+  const handleCheckIn = async () => {
+    if (isSubmitting) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      if (!todayAttendance || !todayAttendance.check_in_time) {
+        // Check in
+        const response = await apiClient.post('/attendance/checkin');
+        toast.success('Checked in successfully!');
+        await fetchAttendanceData(); // Refresh data
+      } else if (!todayAttendance.check_out_time) {
+        // Check out
+        const response = await apiClient.post('/attendance/checkout');
+        toast.success('Checked out successfully!');
+        await fetchAttendanceData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error with attendance:', error);
+      
+      // Show specific error message for "already checked in" case
+      if (error.message && error.message.includes('Already checked in today')) {
+        toast.warning('You have already checked in today!');
+      } else if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error('Failed to update attendance');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const formatTime = (timeString) => {
+    if (!timeString) return '-';
+    return new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  const calculateHours = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return '0';
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const hours = (end - start) / (1000 * 60 * 60);
+    return hours.toFixed(2);
+  };
+  
+  const getAttendanceStatus = (record) => {
+    if (!record.check_in_time) return 'Absent';
+    
+    const checkInTime = new Date(record.check_in_time);
+    const workStartTime = new Date(record.check_in_time);
+    workStartTime.setHours(9, 0, 0, 0); // 9:00 AM
+    
+    if (checkInTime > workStartTime) return 'Late';
+    return 'Present';
+  };
+  
+  const isCheckedIn = todayAttendance?.check_in_time && !todayAttendance?.check_out_time;
+  const hasCheckedOut = todayAttendance?.check_out_time;
+  
   const todayDate = new Date().toDateString();
+  
+  if (loading) {
+    return (
+      <div className="dashboard-layout">
+        <Sidebar userRole="staff" />
+        <div className="main-content">
+          <div style={{ textAlign: 'center', padding: '50px' }}>
+            <p>Loading attendance data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="dashboard-layout">
@@ -50,16 +136,25 @@ const MyAttendance = () => {
           {isCheckedIn ? (
             <div style={{ marginBottom: '20px' }}>
               <p style={{ color: '#28a745', fontSize: '18px', marginBottom: '8px' }}>
-                ✅ Checked in at {checkInTime}
+                ✅ Checked in at {formatTime(todayAttendance?.check_in_time)}
               </p>
               <p style={{ color: '#666' }}>
-                You've been working for {Math.floor(Math.random() * 8 + 1)} hours
+                You've been working for {todayAttendance ? calculateHours(todayAttendance.check_in_time, new Date()) : '0'} hours
+              </p>
+            </div>
+          ) : hasCheckedOut ? (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: '#28a745', fontSize: '18px', marginBottom: '8px' }}>
+                ✅ Checked out at {formatTime(todayAttendance?.check_out_time)}
+              </p>
+              <p style={{ color: '#666' }}>
+                Total work hours: {calculateHours(todayAttendance?.check_in_time, todayAttendance?.check_out_time)} hours
               </p>
             </div>
           ) : (
             <div style={{ marginBottom: '20px' }}>
               <p style={{ color: '#666', fontSize: '18px' }}>
-                {checkInTime ? '✅ Checked out for today' : '⏰ Ready to start your day?'}
+                ⏰ Ready to start your day?
               </p>
             </div>
           )}
@@ -72,20 +167,31 @@ const MyAttendance = () => {
               fontSize: '18px',
               minWidth: '200px'
             }}
-            disabled={checkInTime && !isCheckedIn}
+            disabled={hasCheckedOut || isSubmitting}
           >
-            {checkInTime && !isCheckedIn ? 'Already Checked Out' : 
+            {isSubmitting ? 'Processing...' :
+             hasCheckedOut ? 'Already Checked Out' : 
              isCheckedIn ? '🚪 Check Out' : '⏰ Check In'}
           </button>
         </div>
         
         <div className="stats-grid">
-          {stats.map((stat, index) => (
-            <div key={index} className="stat-card">
-              <div className="stat-number" style={{ color: stat.color }}>{stat.value}</div>
-              <div className="stat-label">{stat.label}</div>
-            </div>
-          ))}
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#28a745' }}>{stats.thisMonth} days</div>
+            <div className="stat-label">This Month</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#007bff' }}>{stats.totalPresent} days</div>
+            <div className="stat-label">Total Present</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#ffc107' }}>{stats.lateArrivals} days</div>
+            <div className="stat-label">Late Arrivals</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#dc3545' }}>{stats.absentDays} days</div>
+            <div className="stat-label">Absent Days</div>
+          </div>
         </div>
         
         <div className="table-container">
@@ -103,23 +209,31 @@ const MyAttendance = () => {
               </tr>
             </thead>
             <tbody>
-              {attendanceHistory.map((record, index) => (
-                <tr key={index}>
-                  <td>{new Date(record.date).toLocaleDateString()}</td>
-                  <td>{record.checkIn}</td>
-                  <td>{record.checkOut}</td>
-                  <td>{record.hours}h</td>
-                  <td>
-                    <span className={`status-badge ${
-                      record.status === 'Present' ? 'status-present' :
-                      record.status === 'Absent' ? 'status-absent' :
-                      'status-pending'
-                    }`}>
-                      {record.status}
-                    </span>
+              {attendanceHistory.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                    No attendance records found
                   </td>
                 </tr>
-              ))}
+              ) : (
+                attendanceHistory.map((record, index) => (
+                  <tr key={index}>
+                    <td>{new Date(record.date).toLocaleDateString()}</td>
+                    <td>{formatTime(record.check_in_time)}</td>
+                    <td>{formatTime(record.check_out_time)}</td>
+                    <td>{calculateHours(record.check_in_time, record.check_out_time)}h</td>
+                    <td>
+                      <span className={`status-badge ${
+                        getAttendanceStatus(record) === 'Present' ? 'status-present' :
+                        getAttendanceStatus(record) === 'Absent' ? 'status-absent' :
+                        'status-pending'
+                      }`}>
+                        {getAttendanceStatus(record)}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -128,15 +242,26 @@ const MyAttendance = () => {
           <h3 style={{ marginBottom: '20px' }}>Attendance Summary</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>92%</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
+                {stats.totalPresent > 0 ? Math.round((stats.totalPresent / (stats.totalPresent + stats.absentDays)) * 100) : 0}%
+              </div>
               <div style={{ fontSize: '14px', color: '#666' }}>Attendance Rate</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>8.2h</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#007bff' }}>
+                {attendanceHistory.length > 0 ? 
+                  (attendanceHistory.reduce((total, record) => 
+                    total + parseFloat(calculateHours(record.check_in_time, record.check_out_time) || 0), 0
+                  ) / attendanceHistory.length).toFixed(1) : 0}h
+              </div>
               <div style={{ fontSize: '14px', color: '#666' }}>Avg. Daily Hours</div>
             </div>
             <div style={{ textAlign: 'center', padding: '16px', background: '#f8f9fa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>164h</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>
+                {attendanceHistory.reduce((total, record) => 
+                  total + parseFloat(calculateHours(record.check_in_time, record.check_out_time) || 0), 0
+                ).toFixed(0)}h
+              </div>
               <div style={{ fontSize: '14px', color: '#666' }}>Total This Month</div>
             </div>
           </div>

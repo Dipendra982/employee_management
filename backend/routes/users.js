@@ -1,11 +1,11 @@
 import express from 'express';
 import { query } from '../config/database.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Get all users (admin only)
-router.get('/', requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 10, role, department, search } = req.query;
     const offset = (page - 1) * limit;
@@ -42,7 +42,7 @@ router.get('/', requireAdmin, async (req, res) => {
     // Get users with pagination
     paramCount++;
     const usersResult = await query(
-      `SELECT id, name, email, role, department, position, phone, address, hire_date, is_active, created_at 
+      `SELECT id, username, email, role, created_at, updated_at 
        FROM users ${whereClause} 
        ORDER BY created_at DESC 
        LIMIT $${paramCount} OFFSET $${paramCount + 1}`,
@@ -70,7 +70,7 @@ router.get('/', requireAdmin, async (req, res) => {
 });
 
 // Get user by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { userId, role } = req.user;
@@ -84,7 +84,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const userResult = await query(
-      'SELECT id, name, email, role, department, position, phone, address, hire_date, is_active, created_at FROM users WHERE id = $1',
+      'SELECT id, username, email, role, created_at, updated_at FROM users WHERE id = $1',
       [id]
     );
 
@@ -281,7 +281,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete user (admin only)
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 

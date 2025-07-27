@@ -1,27 +1,55 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const AdminLeaves = () => {
-  const [leaveRequests, setLeaveRequests] = useState([
-    { id: 1, employee: 'Alice Brown', type: 'Sick Leave', startDate: '2023-12-15', endDate: '2023-12-16', days: 2, reason: 'Medical appointment', status: 'Pending' },
-    { id: 2, employee: 'Tom Wilson', type: 'Vacation', startDate: '2023-12-20', endDate: '2023-12-24', days: 5, reason: 'Family vacation', status: 'Pending' },
-    { id: 3, employee: 'John Doe', type: 'Personal', startDate: '2023-12-18', endDate: '2023-12-18', days: 1, reason: 'Personal work', status: 'Approved' },
-    { id: 4, employee: 'Jane Smith', type: 'Sick Leave', startDate: '2023-12-10', endDate: '2023-12-12', days: 3, reason: 'Flu symptoms', status: 'Rejected' }
-  ]);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchLeaveRequests();
+  }, []);
+
+  const fetchLeaveRequests = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/leaves');
+      setLeaveRequests(response.leaves || []);
+    } catch (error) {
+      console.error('Error fetching leave requests:', error);
+      toast.error('Failed to load leave requests');
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  const handleLeaveAction = (id, action) => {
-    setLeaveRequests(leaveRequests.map(leave => 
-      leave.id === id ? { ...leave, status: action } : leave
-    ));
+  const handleLeaveAction = async (id, action) => {
+    try {
+      await apiClient.put(`/leaves/${id}/status`, {
+        status: action,
+        admin_notes: `${action} by admin`
+      });
+      
+      toast.success(`Leave request ${action} successfully`);
+      
+      // Refresh the data
+      await fetchLeaveRequests();
+      
+    } catch (error) {
+      console.error(`Error ${action} leave:`, error);
+      toast.error(`Failed to ${action} leave request`);
+    }
   };
   
   const stats = [
     { label: 'Total Requests', value: leaveRequests.length.toString() },
-    { label: 'Pending', value: leaveRequests.filter(l => l.status === 'Pending').length.toString() },
-    { label: 'Approved', value: leaveRequests.filter(l => l.status === 'Approved').length.toString() },
-    { label: 'Rejected', value: leaveRequests.filter(l => l.status === 'Rejected').length.toString() }
+    { label: 'Pending', value: leaveRequests.filter(l => l.status === 'pending').length.toString() },
+    { label: 'Approved', value: leaveRequests.filter(l => l.status === 'approved').length.toString() },
+    { label: 'Rejected', value: leaveRequests.filter(l => l.status === 'rejected').length.toString() }
   ];
   
   return (
@@ -61,50 +89,64 @@ const AdminLeaves = () => {
               </tr>
             </thead>
             <tbody>
-              {leaveRequests.map((leave) => (
-                <tr key={leave.id}>
-                  <td>{leave.employee}</td>
-                  <td>{leave.type}</td>
-                  <td>{new Date(leave.startDate).toLocaleDateString()}</td>
-                  <td>{new Date(leave.endDate).toLocaleDateString()}</td>
-                  <td>{leave.days}</td>
-                  <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>{leave.reason}</td>
-                  <td>
-                    <span className={`status-badge ${
-                      leave.status === 'Approved' ? 'status-approved' :
-                      leave.status === 'Rejected' ? 'status-rejected' :
-                      'status-pending'
-                    }`}>
-                      {leave.status}
-                    </span>
-                  </td>
-                  <td>
-                    {leave.status === 'Pending' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
-                          className="btn btn-success"
-                          style={{ padding: '4px 8px', fontSize: '12px' }}
-                          onClick={() => handleLeaveAction(leave.id, 'Approved')}
-                        >
-                          Approve
-                        </button>
-                        <button 
-                          className="btn btn-danger"
-                          style={{ padding: '4px 8px', fontSize: '12px' }}
-                          onClick={() => handleLeaveAction(leave.id, 'Rejected')}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                    {leave.status !== 'Pending' && (
-                      <span style={{ fontSize: '12px', color: '#666' }}>
-                        {leave.status === 'Approved' ? '✓ Processed' : '✗ Processed'}
-                      </span>
-                    )}
+              {loading ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>
+                    Loading leave requests...
                   </td>
                 </tr>
-              ))}
+              ) : leaveRequests.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                    No leave requests found
+                  </td>
+                </tr>
+              ) : (
+                leaveRequests.map((leave) => (
+                  <tr key={leave.id}>
+                    <td>{leave.user?.username || 'Unknown'}</td>
+                    <td>{leave.leave_type?.charAt(0).toUpperCase() + leave.leave_type?.slice(1)}</td>
+                    <td>{new Date(leave.start_date).toLocaleDateString()}</td>
+                    <td>{new Date(leave.end_date).toLocaleDateString()}</td>
+                    <td>{leave.total_days}</td>
+                    <td style={{ maxWidth: '200px', wordWrap: 'break-word' }}>{leave.reason}</td>
+                    <td>
+                      <span className={`status-badge ${
+                        leave.status === 'approved' ? 'status-approved' :
+                        leave.status === 'rejected' ? 'status-rejected' :
+                        'status-pending'
+                      }`}>
+                        {leave.status?.charAt(0).toUpperCase() + leave.status?.slice(1)}
+                      </span>
+                    </td>
+                    <td>
+                      {leave.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button 
+                            className="btn btn-success"
+                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                            onClick={() => handleLeaveAction(leave.id, 'approved')}
+                          >
+                            Approve
+                          </button>
+                          <button 
+                            className="btn btn-danger"
+                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                            onClick={() => handleLeaveAction(leave.id, 'rejected')}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {leave.status !== 'pending' && (
+                        <span style={{ fontSize: '12px', color: '#666' }}>
+                          {leave.status === 'approved' ? '✓ Processed' : '✗ Processed'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

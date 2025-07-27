@@ -19,18 +19,9 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('authToken');
       if (token) {
         apiClient.setToken(token);
-        try {
-          const userData = await apiClient.get('/auth/profile');
-          setUser(userData);
-          setIsAuthenticated(true);
-        } catch (error) {
-          // If token is invalid, clear it and redirect to login
-          console.error('Token validation failed:', error);
-          localStorage.removeItem('authToken');
-          apiClient.setToken(null);
-          setUser(null);
-          setIsAuthenticated(false);
-        }
+        const userData = await apiClient.get('/auth/profile');
+        setUser(userData);
+        setIsAuthenticated(true);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -61,30 +52,22 @@ export const AuthProvider = ({ children }) => {
       throw new Error(error.message || 'Login failed');
     }
   };
+    };
+
+    setUser(mockUser);
+    setIsAuthenticated(true);
+    localStorage.setItem('user', JSON.stringify(mockUser));
+  };
 
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    apiClient.logout();
+    localStorage.removeItem('user');
     navigate('/'); 
   };
 
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        fontSize: '18px'
-      }}>
-        Loading...
-      </div>
-    );
-  }
-
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, signup, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, signup, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

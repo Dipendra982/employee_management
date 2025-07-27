@@ -33,7 +33,14 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Request failed');
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+          this.logout();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+        }
+        throw new Error(data.error || data.message || 'Request failed');
       }
 
       return data;
@@ -79,6 +86,37 @@ class ApiClient {
 
   logout() {
     this.setToken(null);
+  }
+
+  // HTTP method helpers
+  async get(endpoint, options = {}) {
+    return await this.request(endpoint, {
+      method: 'GET',
+      ...options,
+    });
+  }
+
+  async post(endpoint, data = null, options = {}) {
+    return await this.request(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+      ...options,
+    });
+  }
+
+  async put(endpoint, data = null, options = {}) {
+    return await this.request(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+      ...options,
+    });
+  }
+
+  async delete(endpoint, options = {}) {
+    return await this.request(endpoint, {
+      method: 'DELETE',
+      ...options,
+    });
   }
 }
 

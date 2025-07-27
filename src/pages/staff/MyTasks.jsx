@@ -1,52 +1,100 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const MyTasks = () => {
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'Update project documentation', description: 'Review and update the project documentation with latest changes', assignedBy: 'Admin', dueDate: '2023-12-18', priority: 'High', status: 'In Progress' },
-    { id: 2, title: 'Review code changes', description: 'Review the pull request #123 and provide feedback', assignedBy: 'Team Lead', dueDate: '2023-12-20', priority: 'Medium', status: 'Pending' },
-    { id: 3, title: 'Attend team meeting', description: 'Weekly team standup meeting', assignedBy: 'Admin', dueDate: '2023-12-15', priority: 'Low', status: 'Completed' },
-    { id: 4, title: 'Client presentation preparation', description: 'Prepare slides for upcoming client presentation', assignedBy: 'Manager', dueDate: '2023-12-22', priority: 'High', status: 'Pending' },
-    { id: 5, title: 'Database optimization', description: 'Optimize database queries for better performance', assignedBy: 'Tech Lead', dueDate: '2023-12-25', priority: 'Medium', status: 'Pending' }
-  ]);
-  
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [stats, setStats] = useState({ total: 0, pending: 0, inProgress: 0, completed: 0 });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/tasks');
+      setTasks(response.tasks || []);
+      setStats(response.stats || { total: 0, pending: 0, inProgress: 0, completed: 0 });
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      toast.error('Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const filteredTasks = tasks.filter(task => {
     if (filter === 'all') return true;
-    return task.status.toLowerCase().replace(' ', '') === filter;
+    if (filter === 'inprogress') return task.status === 'in-progress';
+    return task.status === filter;
   });
   
-  const handleStatusChange = (taskId, newStatus) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, status: newStatus } : task
-    ));
+  const handleStatusChange = async (taskId, newStatus) => {
+    try {
+      await apiClient.put(`/tasks/${taskId}/status`, { status: newStatus });
+      toast.success('Task status updated successfully!');
+      
+      // Refresh tasks
+      await fetchTasks();
+      
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      toast.error('Failed to update task status');
+    }
   };
-  
-  const stats = [
-    { label: 'Total Tasks', value: tasks.length.toString() },
-    { label: 'Pending', value: tasks.filter(t => t.status === 'Pending').length.toString() },
-    { label: 'In Progress', value: tasks.filter(t => t.status === 'In Progress').length.toString() },
-    { label: 'Completed', value: tasks.filter(t => t.status === 'Completed').length.toString() }
+
+  const formatPriority = (priority) => {
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
+  };
+
+  const formatStatus = (status) => {
+    if (status === 'in-progress') return 'In Progress';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const statsCards = [
+    { label: 'Total Tasks', value: stats.total.toString() },
+    { label: 'Pending', value: stats.pending.toString() },
+    { label: 'In Progress', value: stats.inProgress.toString() },
+    { label: 'Completed', value: stats.completed.toString() }
   ];
   
   const getStatusColor = (status) => {
     switch(status) {
-      case 'Completed': return 'status-approved';
-      case 'In Progress': return 'status-pending';
+      case 'completed': return 'status-approved';
+      case 'in-progress': return 'status-pending';
       default: return 'status-absent';
     }
   };
   
   const getPriorityColor = (priority) => {
     switch(priority) {
-      case 'High': return 'status-rejected';
-      case 'Medium': return 'status-pending';
+      case 'high':
+      case 'urgent': return 'status-rejected';
+      case 'medium': return 'status-pending';
       default: return 'status-approved';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="dashboard-layout">
+        <Sidebar userRole="staff" />
+        <div className="main-content">
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            Loading tasks...
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="dashboard-layout">
@@ -59,7 +107,7 @@ const MyTasks = () => {
         </div>
         
         <div className="stats-grid">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <div key={index} className="stat-card">
               <div className="stat-number">{stat.value}</div>
               <div className="stat-label">{stat.label}</div>
@@ -115,40 +163,40 @@ const MyTasks = () => {
                   <div style={{ flex: 1 }}>
                     <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>{task.title}</h4>
                     <p style={{ margin: '0 0 12px 0', color: '#666', lineHeight: '1.5' }}>
-                      {task.description}
+                      {task.description || 'No description provided'}
                     </p>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#666' }}>
-                      <span>👤 Assigned by: <strong>{task.assignedBy}</strong></span>
-                      <span>📅 Due: <strong>{new Date(task.dueDate).toLocaleDateString()}</strong></span>
+                      <span>👤 Assigned by: <strong>{task.assigner?.username || 'Unknown'}</strong></span>
+                      <span>📅 Due: <strong>{task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}</strong></span>
                     </div>
                   </div>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                     <span className={`status-badge ${getPriorityColor(task.priority)}`}>
-                      {task.priority} Priority
+                      {formatPriority(task.priority)} Priority
                     </span>
                     <span className={`status-badge ${getStatusColor(task.status)}`}>
-                      {task.status}
+                      {formatStatus(task.status)}
                     </span>
                   </div>
                 </div>
                 
-                {task.status !== 'Completed' && (
+                {task.status !== 'completed' && (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                    {task.status === 'Pending' && (
+                    {task.status === 'pending' && (
                       <button 
                         className="btn btn-primary"
-                        onClick={() => handleStatusChange(task.id, 'In Progress')}
+                        onClick={() => handleStatusChange(task.id, 'in-progress')}
                         style={{ padding: '6px 12px', fontSize: '14px' }}
                       >
                         Start Task
                       </button>
                     )}
-                    {task.status === 'In Progress' && (
+                    {task.status === 'in-progress' && (
                       <button 
                         className="btn btn-success"
-                        onClick={() => handleStatusChange(task.id, 'Completed')}
+                        onClick={() => handleStatusChange(task.id, 'completed')}
                         style={{ padding: '6px 12px', fontSize: '14px' }}
                       >
                         Mark Complete
@@ -157,7 +205,7 @@ const MyTasks = () => {
                   </div>
                 )}
                 
-                {task.status === 'Completed' && (
+                {task.status === 'completed' && (
                   <div style={{ 
                     marginTop: '16px', 
                     padding: '8px 12px', 

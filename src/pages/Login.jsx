@@ -1,8 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
-const API_BASE_URL = 'http://localhost:5001/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -11,7 +10,9 @@ const Login = () => {
     role: 'staff'
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
   
   const handleInputChange = (e) => {
     setFormData({
@@ -23,33 +24,22 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.msg || 'Login failed');
-      }
-
-      // Save token to local storage
-      localStorage.setItem('token', data.token);
-
+      const response = await login(formData.email, formData.password);
+      
       // Navigate to the correct dashboard
-      if (data.user.role === 'admin') {
+      if (response.user.role === 'admin') {
         navigate('/admin/dashboard');
       } else {
         navigate('/staff/dashboard');
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -113,8 +103,13 @@ const Login = () => {
             </select>
           </div>
           
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '20px' }}>
-            Sign In
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            style={{ width: '100%', marginBottom: '20px' }}
+            disabled={loading}
+          >
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
           
           <div style={{ textAlign: 'center' }}>

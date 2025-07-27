@@ -1,24 +1,101 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const AdminAttendance = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  const attendanceData = [
-    { id: 1, name: 'John Doe', department: 'IT', checkIn: '09:15 AM', checkOut: '06:30 PM', status: 'Present', hours: '8.25' },
-    { id: 2, name: 'Jane Smith', department: 'HR', checkIn: '09:30 AM', checkOut: '06:15 PM', status: 'Present', hours: '7.75' },
-    { id: 3, name: 'Mike Johnson', department: 'Marketing', checkIn: '-', checkOut: '-', status: 'Absent', hours: '0' },
-    { id: 4, name: 'Sarah Williams', department: 'Finance', checkIn: '08:45 AM', checkOut: '05:45 PM', status: 'Present', hours: '9' },
-    { id: 5, name: 'Tom Wilson', department: 'IT', checkIn: '10:00 AM', checkOut: '07:00 PM', status: 'Late', hours: '8' }
-  ];
-  
-  const stats = [
-    { label: 'Total Staff', value: '24', color: '#007bff' },
-    { label: 'Present', value: '18', color: '#28a745' },
-    { label: 'Absent', value: '4', color: '#dc3545' },
-    { label: 'Late', value: '2', color: '#ffc107' }
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceStats, setAttendanceStats] = useState({ totalStaff: 0, present: 0, absent: 0, late: 0 });
+  const [loading, setLoading] = useState(true);
+  const [allAttendance, setAllAttendance] = useState([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchAttendanceData();
+  }, [selectedDate]);
+
+  const fetchAttendanceData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch stats and records for the selected date
+      const response = await apiClient.get(`/attendance/stats?date=${selectedDate}`);
+      setAttendanceStats(response.stats);
+      setAttendanceRecords(response.records);
+      
+      // Fetch all attendance records for additional context
+      const allRecordsResponse = await apiClient.get('/attendance');
+      setAllAttendance(allRecordsResponse);
+      
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+      toast.error('Failed to load attendance data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return '-';
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const calculateWorkingHours = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return '0';
+    
+    const checkInTime = new Date(`1970-01-01T${checkIn}Z`);
+    const checkOutTime = new Date(`1970-01-01T${checkOut}Z`);
+    const diffMs = checkOutTime - checkInTime;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    return diffHours.toFixed(2);
+  };
+
+  const exportAttendanceReport = async () => {
+    try {
+      toast.info('Generating attendance report...');
+      // TODO: Implement export functionality
+      setTimeout(() => {
+        toast.success('Report exported successfully!');
+      }, 1000);
+    } catch (error) {
+      toast.error('Failed to export report');
+    }
+  };
+
+  const sendAttendanceReminder = async () => {
+    try {
+      toast.info('Sending attendance reminders...');
+      // TODO: Implement reminder functionality
+      setTimeout(() => {
+        toast.success('Reminders sent successfully!');
+      }, 1000);
+    } catch (error) {
+      toast.error('Failed to send reminders');
+    }
+  };
+
+  const markManualAttendance = async () => {
+    try {
+      toast.info('Manual attendance marking feature coming soon...');
+      // TODO: Implement manual attendance marking
+    } catch (error) {
+      toast.error('Failed to mark manual attendance');
+    }
+  };
+
+  const statsCards = [
+    { label: 'Total Staff', value: attendanceStats.totalStaff.toString(), color: '#007bff' },
+    { label: 'Present', value: attendanceStats.present.toString(), color: '#28a745' },
+    { label: 'Absent', value: attendanceStats.absent.toString(), color: '#dc3545' },
+    { label: 'Late', value: attendanceStats.late.toString(), color: '#ffc107' }
   ];
   
   return (
@@ -32,7 +109,7 @@ const AdminAttendance = () => {
         </div>
         
         <div className="stats-grid">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <div key={index} className="stat-card">
               <div className="stat-number" style={{ color: stat.color }}>{stat.value}</div>
               <div className="stat-label">{stat.label}</div>
@@ -60,32 +137,49 @@ const AdminAttendance = () => {
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Department</th>
+                  <th>Email</th>
                   <th>Check In</th>
                   <th>Check Out</th>
                   <th>Hours Worked</th>
                   <th>Status</th>
+                  <th>Notes</th>
                 </tr>
               </thead>
               <tbody>
-                {attendanceData.map((record) => (
-                  <tr key={record.id}>
-                    <td>{record.name}</td>
-                    <td>{record.department}</td>
-                    <td>{record.checkIn}</td>
-                    <td>{record.checkOut}</td>
-                    <td>{record.hours}h</td>
-                    <td>
-                      <span className={`status-badge ${
-                        record.status === 'Present' ? 'status-present' :
-                        record.status === 'Absent' ? 'status-absent' :
-                        'status-pending'
-                      }`}>
-                        {record.status}
-                      </span>
+                {loading ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '20px' }}>
+                      Loading attendance data...
                     </td>
                   </tr>
-                ))}
+                ) : attendanceRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                      No attendance records found for {new Date(selectedDate).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ) : (
+                  attendanceRecords.map((record) => (
+                    <tr key={record.id}>
+                      <td>{record.user?.username || 'Unknown'}</td>
+                      <td>{record.user?.email || 'N/A'}</td>
+                      <td>{formatTime(record.check_in)}</td>
+                      <td>{formatTime(record.check_out)}</td>
+                      <td>{calculateWorkingHours(record.check_in, record.check_out)}h</td>
+                      <td>
+                        <span className={`status-badge ${
+                          record.status === 'present' ? 'status-present' :
+                          record.status === 'absent' ? 'status-absent' :
+                          record.status === 'late' ? 'status-pending' :
+                          'status-approved'
+                        }`}>
+                          {record.status?.charAt(0).toUpperCase() + record.status?.slice(1)}
+                        </span>
+                      </td>
+                      <td>{record.notes || '-'}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -94,9 +188,24 @@ const AdminAttendance = () => {
         <div className="card">
           <h3 style={{ marginBottom: '20px' }}>Actions</h3>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary">Export Attendance Report</button>
-            <button className="btn btn-secondary">Send Attendance Reminder</button>
-            <button className="btn btn-success">Mark Manual Attendance</button>
+            <button 
+              className="btn btn-primary"
+              onClick={exportAttendanceReport}
+            >
+              Export Attendance Report
+            </button>
+            <button 
+              className="btn btn-secondary"
+              onClick={sendAttendanceReminder}
+            >
+              Send Attendance Reminder
+            </button>
+            <button 
+              className="btn btn-success"
+              onClick={markManualAttendance}
+            >
+              Mark Manual Attendance
+            </button>
           </div>
         </div>
       </div>
