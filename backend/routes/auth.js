@@ -176,14 +176,67 @@ router.get('/profile', authenticateToken, async (req, res) => {
       email: user.email,
       role: user.role,
       name: user.name || user.username,
+      phone: user.phone,
       department: user.department,
       position: user.position,
+      employeeId: user.employeeId,
+      joinDate: user.joinDate,
+      manager: user.manager,
+      address: user.address,
+      emergencyContact: user.emergencyContact,
       is_active: user.is_active
     });
   } catch (error) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ 
       message: 'Error fetching profile',
+      error: error.message 
+    });
+  }
+});
+
+// Update profile endpoint
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, phone, address, emergencyContact } = req.body;
+    
+    const user = await User.findByPk(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update only the fields that users can modify
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (phone !== undefined) updates.phone = phone;
+    if (address !== undefined) updates.address = address;
+    if (emergencyContact !== undefined) updates.emergencyContact = emergencyContact;
+
+    await user.update(updates);
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        phone: user.phone,
+        department: user.department,
+        position: user.position,
+        employeeId: user.employeeId,
+        joinDate: user.joinDate,
+        manager: user.manager,
+        address: user.address,
+        emergencyContact: user.emergencyContact,
+        is_active: user.is_active
+      }
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ 
+      message: 'Error updating profile',
       error: error.message 
     });
   }

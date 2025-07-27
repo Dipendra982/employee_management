@@ -1,67 +1,53 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const StaffNotices = () => {
-  const notices = [
-    {
-      id: 1,
-      title: 'Holiday Schedule Update',
-      content: 'Please note the updated holiday schedule for December 2023. The office will be closed from December 25th to January 1st. All pending work should be completed before December 22nd. Emergency contacts will be available during the holiday period.',
-      date: '2023-12-10',
-      priority: 'High',
-      author: 'HR Department'
-    },
-    {
-      id: 2,
-      title: 'New Security Protocols',
-      content: 'We are implementing new security measures starting next week. All employees must update their passwords and enable two-factor authentication. Please attend the security briefing scheduled for December 15th at 2:00 PM in the main conference room.',
-      date: '2023-12-08',
-      priority: 'Medium',
-      author: 'IT Security Team'
-    },
-    {
-      id: 3,
-      title: 'Team Building Event',
-      content: 'Join us for our annual team building event on December 22nd at Central Park. Activities include team games, lunch, and awards ceremony. Please confirm your attendance by December 18th. Dress code: casual outdoor attire.',
-      date: '2023-12-05',
-      priority: 'Low',
-      author: 'Admin'
-    },
-    {
-      id: 4,
-      title: 'Performance Review Process',
-      content: 'The annual performance review process will begin on January 2nd, 2024. Please complete your self-assessment forms by January 15th. Review meetings will be scheduled throughout January. Contact HR for any questions about the process.',
-      date: '2023-12-03',
-      priority: 'Medium',
-      author: 'HR Department'
-    },
-    {
-      id: 5,
-      title: 'Office Renovation Notice',
-      content: 'The 3rd floor will undergo renovation from January 8-12, 2024. Affected departments will be temporarily relocated to the 2nd floor. Please coordinate with your managers for seating arrangements. We apologize for any inconvenience.',
-      date: '2023-12-01',
-      priority: 'High',
-      author: 'Facilities Management'
-    }
-  ];
-  
-  const stats = [
-    { label: 'Total Notices', value: notices.length.toString() },
-    { label: 'High Priority', value: notices.filter(n => n.priority === 'High').length.toString() },
-    { label: 'This Month', value: notices.filter(n => new Date(n.date).getMonth() === new Date().getMonth()).length.toString() },
-    { label: 'Unread', value: '2' } // Mock unread count
-  ];
-  
-  const getPriorityColor = (priority) => {
-    switch(priority) {
-      case 'High': return 'status-rejected';
-      case 'Medium': return 'status-pending';
-      default: return 'status-approved';
+  const [notices, setNotices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, thisMonth: 0, urgent: 0, important: 0 });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchNotices();
+  }, []);
+
+  const fetchNotices = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/notices');
+      setNotices(response.notices || []);
+      setStats(response.stats || { total: 0, thisMonth: 0, urgent: 0, important: 0 });
+    } catch (error) {
+      console.error('Error fetching notices:', error);
+      toast.error('Failed to load notices');
+    } finally {
+      setLoading(false);
     }
   };
-  
+
+  const formatType = (type) => {
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getTypeColor = (type) => {
+    switch(type) {
+      case 'urgent': return 'status-rejected';
+      case 'important': return 'status-pending';
+      case 'announcement': return 'status-approved';
+      default: return 'status-present';
+    }
+  };
+
+  const statsCards = [
+    { label: 'Total Notices', value: stats.total.toString() },
+    { label: 'This Month', value: stats.thisMonth.toString() },
+    { label: 'Urgent', value: stats.urgent.toString() },
+    { label: 'Important', value: stats.important.toString() }
+  ];
+
   return (
     <div className="dashboard-layout">
       <Sidebar userRole="staff" />
@@ -73,7 +59,7 @@ const StaffNotices = () => {
         </div>
         
         <div className="stats-grid">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <div key={index} className="stat-card">
               <div className="stat-number">{stat.value}</div>
               <div className="stat-label">{stat.label}</div>
@@ -82,129 +68,84 @@ const StaffNotices = () => {
         </div>
         
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3>All Notices</h3>
-            <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '14px' }}>
-              Mark All as Read
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3>All Notices ({notices.length})</h3>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {notices.map((notice) => (
-              <div key={notice.id} style={{
-                border: '1px solid #eee',
-                borderRadius: '8px',
-                padding: '20px',
-                background: '#f8f9fa',
-                transition: 'all 0.3s ease'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: '18px' }}>
-                      {notice.title}
-                    </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '14px', color: '#666' }}>
-                        📅 {new Date(notice.date).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
-                      </span>
-                      <span style={{ fontSize: '14px', color: '#666' }}>
-                        👤 {notice.author}
-                      </span>
-                      <span className={`status-badge ${getPriorityColor(notice.priority)}`}>
-                        {notice.priority} Priority
-                      </span>
+          {loading ? (
+            <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+              Loading notices...
+            </p>
+          ) : notices.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+              No notices available at the moment.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {notices.map((notice) => (
+                <div key={notice.id} style={{
+                  border: '1px solid #eee',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  background: '#f8f9fa',
+                  transition: 'all 0.3s ease'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: '18px' }}>
+                        {notice.title}
+                      </h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '14px', color: '#666' }}>
+                          📅 {new Date(notice.publish_date || notice.created_at).toLocaleDateString()}
+                        </span>
+                        <span style={{ fontSize: '14px', color: '#666' }}>
+                          👤 By: {notice.publisher?.username || 'Admin'}
+                        </span>
+                        <span className={`status-badge ${getTypeColor(notice.type)}`}>
+                          {formatType(notice.type)}
+                        </span>
+                        {notice.target_audience !== 'all' && (
+                          <span className="status-badge status-approved">
+                            {notice.target_audience === 'staff' ? 'Staff Only' : 'Admin Only'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <p style={{ 
-                  margin: '0', 
-                  lineHeight: '1.6', 
-                  color: '#555',
-                  fontSize: '16px'
-                }}>
-                  {notice.content}
-                </p>
-                
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  marginTop: '16px',
-                  paddingTop: '16px',
-                  borderTop: '1px solid #dee2e6'
-                }}>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: '12px' }}>
-                      Mark as Read
-                    </button>
-                    <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: '12px' }}>
-                      Save for Later
-                    </button>
+                  
+                  <div style={{ 
+                    padding: '16px',
+                    background: '#fff',
+                    borderRadius: '6px',
+                    border: '1px solid #e9ecef'
+                  }}>
+                    <p style={{ 
+                      margin: '0', 
+                      lineHeight: '1.6', 
+                      color: '#333',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {notice.content}
+                    </p>
                   </div>
                   
-                  {notice.priority === 'High' && (
+                  {notice.expiry_date && new Date(notice.expiry_date) > new Date() && (
                     <div style={{ 
-                      color: '#dc3545', 
-                      fontSize: '12px', 
-                      fontWeight: 'bold',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      marginTop: '12px',
+                      padding: '8px 12px',
+                      background: '#fff3cd',
+                      color: '#856404',
+                      borderRadius: '4px',
+                      fontSize: '14px'
                     }}>
-                      ⚠️ Action Required
+                      ⏰ Expires on: {new Date(notice.expiry_date).toLocaleDateString()}
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div className="card">
-          <h3 style={{ marginBottom: '16px' }}>Notice Categories</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            <div style={{ 
-              padding: '16px', 
-              background: '#e3f2fd', 
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>📢</div>
-              <div style={{ fontWeight: 'bold', color: '#1976d2' }}>General</div>
+              ))}
             </div>
-            <div style={{ 
-              padding: '16px', 
-              background: '#f3e5f5', 
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>🏢</div>
-              <div style={{ fontWeight: 'bold', color: '#7b1fa2' }}>HR</div>
-            </div>
-            <div style={{ 
-              padding: '16px', 
-              background: '#e8f5e8', 
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>💻</div>
-              <div style={{ fontWeight: 'bold', color: '#388e3c' }}>IT</div>
-            </div>
-            <div style={{ 
-              padding: '16px', 
-              background: '#fff3e0', 
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎉</div>
-              <div style={{ fontWeight: 'bold', color: '#f57c00' }}>Events</div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

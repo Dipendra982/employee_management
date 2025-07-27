@@ -46,7 +46,15 @@ router.get('/', authenticateToken, async (req, res) => {
       
       res.status(200).json({ notices, stats });
     } else {
-      res.status(200).json({ notices });
+      // Calculate stats for admin
+      const stats = {
+        total: notices.length,
+        published: notices.filter(n => n.is_published).length,
+        urgent: notices.filter(n => n.type === 'urgent').length,
+        important: notices.filter(n => n.type === 'important').length
+      };
+      
+      res.status(200).json({ notices, stats });
     }
   } catch (error) {
     console.error('Error fetching notices:', error);

@@ -1,35 +1,86 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { apiClient } from '../../lib/api';
 import Sidebar from '../../components/Sidebar';
 import '../../styles/dashboard.css';
 
 const Profile = () => {
+  const { user, setUser } = useAuth();
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [profileData, setProfileData] = useState({
-    fullName: 'John Doe',
-    email: 'john.doe@company.com',
-    phone: '+1 (555) 123-4567',
-    department: 'Information Technology',
-    position: 'Software Developer',
-    employeeId: 'EMP001',
-    joinDate: '2022-03-15',
-    manager: 'Jane Smith',
-    address: '123 Main Street, City, State 12345',
-    emergencyContact: 'Jane Doe - +1 (555) 987-6543'
+    name: '',
+    email: '',
+    phone: '',
+    department: '',
+    position: '',
+    employeeId: '',
+    joinDate: '',
+    manager: '',
+    address: '',
+    emergencyContact: ''
   });
   
   const [editData, setEditData] = useState({ ...profileData });
+
+  useEffect(() => {
+    if (user) {
+      const userData = {
+        name: user.name || user.username || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        department: user.department || '',
+        position: user.position || '',
+        employeeId: user.employeeId || '',
+        joinDate: user.joinDate || '',
+        manager: user.manager || '',
+        address: user.address || '',
+        emergencyContact: user.emergencyContact || ''
+      };
+      setProfileData(userData);
+      setEditData(userData);
+    }
+  }, [user]);
   
   const handleEdit = () => {
     setIsEditing(true);
     setEditData({ ...profileData });
   };
   
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    setProfileData({ ...editData });
-    setIsEditing(false);
-    alert('Profile updated successfully!');
+    setLoading(true);
+    
+    try {
+      // Only send fields that users can edit
+      const updateData = {
+        name: editData.name,
+        phone: editData.phone,
+        address: editData.address,
+        emergencyContact: editData.emergencyContact
+      };
+
+      const response = await apiClient.updateProfile(updateData);
+      
+      // Update local state
+      setProfileData({ ...profileData, ...updateData });
+      setIsEditing(false);
+      
+      // Update user context if available
+      if (setUser && response.user) {
+        setUser(response.user);
+      }
+      
+      toast.success('Profile updated successfully!');
+    } catch (error) {
+      console.error('Profile update error:', error);
+      toast.error(error.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleCancel = () => {
@@ -40,6 +91,33 @@ const Profile = () => {
   const handleInputChange = (field, value) => {
     setEditData({ ...editData, [field]: value });
   };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not set';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const calculateYearsOfService = (joinDateString) => {
+    if (!joinDateString) return 0;
+    const joinDate = new Date(joinDateString);
+    const today = new Date();
+    const years = Math.floor((today - joinDate) / (365.25 * 24 * 60 * 60 * 1000));
+    return Math.max(0, years);
+  };
+
+  if (!user) {
+    return (
+      <div className="dashboard-layout">
+        <Sidebar userRole="staff" />
+        <div className="main-content">
+          <div className="dashboard-header">
+            <h1 className="dashboard-title">Profile</h1>
+            <p className="dashboard-subtitle">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="dashboard-layout">
@@ -61,10 +139,18 @@ const Profile = () => {
                 </button>
               ) : (
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button className="btn btn-success" onClick={handleSave}>
-                    💾 Save Changes
+                  <button 
+                    className="btn btn-success" 
+                    onClick={handleSave}
+                    disabled={loading}
+                  >
+                    {loading ? '💾 Saving...' : '💾 Save Changes'}
                   </button>
-                  <button className="btn btn-secondary" onClick={handleCancel}>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={handleCancel}
+                    disabled={loading}
+                  >
                     ❌ Cancel
                   </button>
                 </div>
@@ -79,32 +165,22 @@ const Profile = () => {
                     <input
                       type="text"
                       className="form-control"
-                      value={editData.fullName}
-                      onChange={(e) => handleInputChange('fullName', e.target.value)}
+                      value={editData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
                       required
                     />
                   ) : (
                     <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                      {profileData.fullName}
+                      {profileData.name || 'Not set'}
                     </div>
                   )}
                 </div>
                 
                 <div className="form-group">
                   <label className="form-label">Email Address</label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      className="form-control"
-                      value={editData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      required
-                    />
-                  ) : (
-                    <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                      {profileData.email}
-                    </div>
-                  )}
+                  <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px', color: '#666' }}>
+                    {profileData.email} (Read-only)
+                  </div>
                 </div>
                 
                 <div className="form-group">
@@ -115,11 +191,11 @@ const Profile = () => {
                       className="form-control"
                       value={editData.phone}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
-                      required
+                      placeholder="Enter your phone number"
                     />
                   ) : (
                     <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                      {profileData.phone}
+                      {profileData.phone || 'Not set'}
                     </div>
                   )}
                 </div>
@@ -127,21 +203,21 @@ const Profile = () => {
                 <div className="form-group">
                   <label className="form-label">Department</label>
                   <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px', color: '#666' }}>
-                    {profileData.department} (Read-only)
+                    {profileData.department || 'Not assigned'} (Read-only)
                   </div>
                 </div>
                 
                 <div className="form-group">
                   <label className="form-label">Position</label>
                   <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px', color: '#666' }}>
-                    {profileData.position} (Read-only)
+                    {profileData.position || 'Not assigned'} (Read-only)
                   </div>
                 </div>
                 
                 <div className="form-group">
                   <label className="form-label">Employee ID</label>
                   <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px', color: '#666' }}>
-                    {profileData.employeeId} (Read-only)
+                    {profileData.employeeId || 'Not assigned'} (Read-only)
                   </div>
                 </div>
               </div>
@@ -154,11 +230,11 @@ const Profile = () => {
                     rows="2"
                     value={editData.address}
                     onChange={(e) => handleInputChange('address', e.target.value)}
-                    required
+                    placeholder="Enter your address"
                   />
                 ) : (
                   <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                    {profileData.address}
+                    {profileData.address || 'Not set'}
                   </div>
                 )}
               </div>
@@ -172,11 +248,10 @@ const Profile = () => {
                     value={editData.emergencyContact}
                     onChange={(e) => handleInputChange('emergencyContact', e.target.value)}
                     placeholder="Name - Phone Number"
-                    required
                   />
                 ) : (
                   <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '6px' }}>
-                    {profileData.emergencyContact}
+                    {profileData.emergencyContact || 'Not set'}
                   </div>
                 )}
               </div>
@@ -190,17 +265,17 @@ const Profile = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#666' }}>Join Date:</span>
                   <span style={{ fontWeight: 'bold' }}>
-                    {new Date(profileData.joinDate).toLocaleDateString()}
+                    {formatDate(profileData.joinDate)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#666' }}>Manager:</span>
-                  <span style={{ fontWeight: 'bold' }}>{profileData.manager}</span>
+                  <span style={{ fontWeight: 'bold' }}>{profileData.manager || 'Not assigned'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#666' }}>Years of Service:</span>
                   <span style={{ fontWeight: 'bold' }}>
-                    {Math.floor((new Date() - new Date(profileData.joinDate)) / (365.25 * 24 * 60 * 60 * 1000))} years
+                    {calculateYearsOfService(profileData.joinDate)} years
                   </span>
                 </div>
               </div>

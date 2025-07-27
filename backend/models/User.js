@@ -29,6 +29,47 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('admin', 'staff'),
     defaultValue: 'staff',
     allowNull: false
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  position: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  employeeId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
+  joinDate: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  manager: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  address: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  emergencyContact: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
   }
 }, {
   tableName: 'users',

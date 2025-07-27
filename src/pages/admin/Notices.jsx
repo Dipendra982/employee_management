@@ -1,37 +1,95 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
+import { apiClient } from '../../lib/api';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/dashboard.css';
 
 const AdminNotices = () => {
-  const [notices, setNotices] = useState([
-    { id: 1, title: 'Holiday Schedule Update', content: 'Please note the updated holiday schedule for December 2023...', date: '2023-12-10', priority: 'High' },
-    { id: 2, title: 'New Security Protocols', content: 'We are implementing new security measures starting next week...', date: '2023-12-08', priority: 'Medium' },
-    { id: 3, title: 'Team Building Event', content: 'Join us for our annual team building event on December 22nd...', date: '2023-12-05', priority: 'Low' }
-  ]);
+  const [notices, setNotices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stats, setStats] = useState({ total: 0, published: 0, urgent: 0, important: 0 });
+  const { toast } = useToast();
   
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNotice, setNewNotice] = useState({
     title: '',
     content: '',
-    priority: 'Medium'
+    type: 'general',
+    target_audience: 'all',
+    priority: 1
   });
-  
-  const handleAddNotice = (e) => {
-    e.preventDefault();
-    const notice = {
-      id: Date.now(),
-      ...newNotice,
-      date: new Date().toISOString().split('T')[0]
-    };
-    setNotices([notice, ...notices]);
-    setNewNotice({ title: '', content: '', priority: 'Medium' });
-    setShowAddForm(false);
+
+  useEffect(() => {
+    fetchNotices();
+  }, []);
+
+  const fetchNotices = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get('/notices');
+      setNotices(response.notices || []);
+      setStats(response.stats || { total: 0, published: 0, urgent: 0, important: 0 });
+    } catch (error) {
+      console.error('Error fetching notices:', error);
+      toast.error('Failed to load notices');
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const handleDeleteNotice = (id) => {
-    if (window.confirm('Are you sure you want to delete this notice?')) {
-      setNotices(notices.filter(notice => notice.id !== id));
+  const handleAddNotice = async (e) => {
+    e.preventDefault();
+    
+    if (isSubmitting) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      await apiClient.post('/notices', newNotice);
+      
+      toast.success('Notice posted successfully!');
+      setNewNotice({ title: '', content: '', type: 'general', target_audience: 'all', priority: 1 });
+      setShowAddForm(false);
+      
+      // Refresh notices
+      await fetchNotices();
+      
+    } catch (error) {
+      console.error('Error creating notice:', error);
+      toast.error(error.response?.data?.error || 'Failed to post notice');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleDeleteNotice = async (id, title) => {
+    if (window.confirm(`Are you sure you want to delete "${title}"?`)) {
+      try {
+        await apiClient.delete(`/notices/${id}`);
+        toast.success('Notice deleted successfully!');
+        
+        // Refresh notices
+        await fetchNotices();
+        
+      } catch (error) {
+        console.error('Error deleting notice:', error);
+        toast.error('Failed to delete notice');
+      }
+    }
+  };
+
+  const formatType = (type) => {
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getTypeColor = (type) => {
+    switch(type) {
+      case 'urgent': return 'status-rejected';
+      case 'important': return 'status-pending';
+      case 'announcement': return 'status-approved';
+      default: return 'status-present';
     }
   };
   
@@ -43,6 +101,25 @@ const AdminNotices = () => {
         <div className="dashboard-header">
           <h1 className="dashboard-title">Notices & Announcements</h1>
           <p className="dashboard-subtitle">Post and manage company-wide announcements</p>
+        </div>
+        
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#007bff' }}>{stats.total}</div>
+            <div className="stat-label">Total Notices</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#28a745' }}>{stats.published}</div>
+            <div className="stat-label">Published</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#dc3545' }}>{stats.urgent}</div>
+            <div className="stat-label">Urgent</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number" style={{ color: '#ffc107' }}>{stats.important}</div>
+            <div className="stat-label">Important</div>
+          </div>
         </div>
         
         <div style={{ marginBottom: '24px' }}>
@@ -71,16 +148,31 @@ const AdminNotices = () => {
               </div>
               
               <div className="form-group">
-                <label className="form-label">Priority Level</label>
+                <label className="form-label">Notice Type</label>
                 <select
                   className="form-control"
-                  value={newNotice.priority}
-                  onChange={(e) => setNewNotice({...newNotice, priority: e.target.value})}
+                  value={newNotice.type}
+                  onChange={(e) => setNewNotice({...newNotice, type: e.target.value})}
                   style={{ width: '200px' }}
                 >
-                  <option value="Low">Low Priority</option>
-                  <option value="Medium">Medium Priority</option>
-                  <option value="High">High Priority</option>
+                  <option value="general">General</option>
+                  <option value="important">Important</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="announcement">Announcement</option>
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Target Audience</label>
+                <select
+                  className="form-control"
+                  value={newNotice.target_audience}
+                  onChange={(e) => setNewNotice({...newNotice, target_audience: e.target.value})}
+                  style={{ width: '200px' }}
+                >
+                  <option value="all">All Staff</option>
+                  <option value="admin">Admin Only</option>
+                  <option value="staff">Staff Only</option>
                 </select>
               </div>
               
@@ -96,7 +188,13 @@ const AdminNotices = () => {
                 />
               </div>
               
-              <button type="submit" className="btn btn-success">Post Notice</button>
+              <button 
+                type="submit" 
+                className="btn btn-success"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Posting...' : 'Post Notice'}
+              </button>
             </form>
           </div>
         )}
@@ -104,7 +202,11 @@ const AdminNotices = () => {
         <div className="card">
           <h3 style={{ marginBottom: '20px' }}>Published Notices ({notices.length})</h3>
           
-          {notices.length === 0 ? (
+          {loading ? (
+            <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+              Loading notices...
+            </p>
+          ) : notices.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
               No notices posted yet. Click "Post New Notice" to add one.
             </p>
@@ -120,23 +222,26 @@ const AdminNotices = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div>
                       <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>{notice.title}</h4>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '14px', color: '#666' }}>
-                          Posted on {new Date(notice.date).toLocaleDateString()}
+                          Posted on {new Date(notice.publish_date || notice.created_at).toLocaleDateString()}
                         </span>
-                        <span className={`status-badge ${
-                          notice.priority === 'High' ? 'status-rejected' :
-                          notice.priority === 'Medium' ? 'status-pending' :
-                          'status-approved'
-                        }`}>
-                          {notice.priority} Priority
+                        <span style={{ fontSize: '14px', color: '#666' }}>
+                          By: {notice.publisher?.username || 'Unknown'}
+                        </span>
+                        <span className={`status-badge ${getTypeColor(notice.type)}`}>
+                          {formatType(notice.type)}
+                        </span>
+                        <span className="status-badge status-approved">
+                          {notice.target_audience === 'all' ? 'All Staff' : 
+                           notice.target_audience === 'admin' ? 'Admin Only' : 'Staff Only'}
                         </span>
                       </div>
                     </div>
                     <button
                       className="btn btn-danger"
                       style={{ padding: '4px 8px', fontSize: '12px' }}
-                      onClick={() => handleDeleteNotice(notice.id)}
+                      onClick={() => handleDeleteNotice(notice.id, notice.title)}
                     >
                       Delete
                     </button>

@@ -88,6 +88,13 @@ class ApiClient {
     this.setToken(null);
   }
 
+  async updateProfile(profileData) {
+    return await this.request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+  }
+
   // HTTP method helpers
   async get(endpoint, options = {}) {
     return await this.request(endpoint, {
